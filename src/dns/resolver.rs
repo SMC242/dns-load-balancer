@@ -52,6 +52,7 @@ pub struct DNSHeader {
     transaction_id: u16,
     flags: DNSHeaderFlags,
     n_questions: u16,
+    n_answers: u16,
     n_authority_rrs: u16,
     n_additional_rrs: u16,
 }
@@ -146,6 +147,6 @@ pub struct ResourceRecord {
 
 pub enum DNSHeaderParseError {}
 
-pub fn parse_header(bitstream: std::io::Bytes<u8>) -> Result<DNSHeader, DNSHeaderParseError> {
+pub fn parse_header<T>(bitstream: std::io::Bytes<T>) -> Result<DNSHeader, DNSHeaderParseError> {
     todo!("Implement parse_header")
 }
