@@ -166,8 +166,10 @@ pub enum DNSHeaderParseError {
     InvalidNQuestions,
 }
 
+#[derive(Debug)]
 pub enum DNSBodyParseError {
     IoError(IoError),
+    BadLabel(i32),
 }
 
 /// Assumption: big-endian
@@ -355,10 +357,45 @@ pub fn parse_header<T: std::io::Read>(
     })
 }
 
-pub fn parse_body(
+fn read_label<T: Read>(bitstream: &mut Bytes<T>) -> Result<usize, DNSBodyParseError> {
+    bitstream
+        .next()
+        .ok_or(DNSBodyParseError::IoError(IoError::new(
+            ErrorKind::UnexpectedEof,
+            "Missing label length",
+        )))?
+        .map_err(DNSBodyParseError::IoError)
+        .map(usize::from)
+}
+
+pub fn parse_name<T: Read>(bitstream: &mut Bytes<T>) -> Result<Vec<String>, DNSBodyParseError> {
+    let mut segments = Vec::new();
+
+    // Each label is preceeded by a byte containing the length of the label in bytes.
+    // The name is terminated with a length=0
+    let mut segment_idx = 0;
+    let mut label_length = read_label(bitstream)?;
+    while label_length != 0 {
+        let label_bytes = bitstream
+            .take(label_length)
+            .collect::<Result<Vec<u8>, _>>()
+            .map_err(DNSBodyParseError::IoError)?;
+        let label =
+            String::from_utf8(label_bytes).map_err(|_| DNSBodyParseError::BadLabel(segment_idx))?;
+        segments.push(label);
+
+        segment_idx += 1;
+        label_length = read_label(bitstream)?;
+    }
+
+    Ok(segments)
+}
+
+pub fn parse_body<T: Read>(
     headers: DNSHeaders,
     bitstream: &mut Bytes<T>,
 ) -> Result<DNSRequest, DNSBodyParseError> {
+    todo!("Parse the resource records according to the headers")
 }
 
 #[cfg(test)]
@@ -453,5 +490,36 @@ mod tests {
             show_binary(&expected_raw),
             show_binary(&output_raw)
         )
+    }
+
+    #[test]
+    fn test_parse_name_normal() {
+        let example_dotcom_raw = [
+            0x07, b'e', b'x', b'a', b'm', b'p', b'l', b'e', 0x03, b'c', b'o', b'm', 0x00,
+        ];
+
+        let example_dotcom_result = parse_name(&mut make_bitstream(&example_dotcom_raw))
+            .expect("Parsing example.com should succeed");
+        assert_eq!(
+            example_dotcom_result,
+            vec!["example".to_string(), "com".to_string()]
+        );
+
+        let nested_raw = [
+            0x03, b'w', b'w', b'w', 0x04, b'm', b'a', b'i', b'l', 0x07, b'e', b'x', b'a', b'm',
+            b'p', b'l', b'e', 0x03, b'c', b'o', b'm', 0x00,
+        ];
+
+        let nested_result = parse_name(&mut make_bitstream(&nested_raw))
+            .expect("Parsing www.mail.example.com should succeed");
+        assert_eq!(
+            nested_result,
+            vec![
+                "www".to_string(),
+                "mail".to_string(),
+                "example".to_string(),
+                "com".to_string()
+            ]
+        );
     }
 }
