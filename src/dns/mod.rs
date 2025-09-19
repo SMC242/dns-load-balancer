@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 
+pub mod messages;
 pub mod resolver;
 
 type UnixTimestamp = i32;
