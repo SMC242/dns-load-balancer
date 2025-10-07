@@ -23,6 +23,11 @@
 
 - DNS is traditionally built on UDP but can use TCP
 
+## Parsing
+
+- Each segment of a resource record is preceeded by a single byte representing the length of the segment
+  - Example for image.google.com: 5image6google3com
+
 # TLDs
 
 - The list of TLDs can be found [here](https://data.iana.org/TLD/tlds-alpha-by-domain.txt)
